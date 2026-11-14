@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>読書アウトプットノート</title>
+  <meta name="description" content="読んだ本をアウトプットして、知識の定着と行動につなげるノート">
+  <meta name="theme-color" content="#f6f2e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="読書ノート">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+  <header class="app-header">
+    <a href="#/" class="brand"><span class="brand-mark" aria-hidden="true"></span>読書アウトプットノート</a>
+    <button class="icon-btn" data-act="settings" aria-label="データの管理">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+    </button>
+  </header>
+
+  <main id="app"></main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-backdrop" data-act="close-modal"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true"></div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>
