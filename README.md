@@ -23,7 +23,7 @@
 | `index.html` | 画面の枠組み |
 | `style.css` | 見た目（ノート風デザイン） |
 | `app.js` | 動き（保存、検索、LINE送信など） |
-| `manifest.webmanifest`, `icon*.png`, `icon.svg` | ホーム画面に追加したときのアプリ名とアイコン |
+| `manifest.webmanifest`, `icon-*.png`（元画像は `icon-src/`） | ホーム画面に追加したときのアプリ名とアイコン |
 
 ## 使っている無料サービス（登録は要りません）
 
