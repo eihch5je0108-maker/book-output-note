@@ -427,3 +427,7 @@ input[type="checkbox"]:checked::after {
 .ch-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch-chip input[type="checkbox"] { width: 18px; height: 18px; }
 .ch-chip input[type="checkbox"]:checked::after { left: 5px; top: 1px; }
+
+/* ---------- 確認ダイアログ ---------- */
+.confirm-msg { margin: 8px 0 18px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.btn.danger { background: var(--red); border-color: var(--red); color: #fff; }

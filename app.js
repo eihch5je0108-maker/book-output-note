@@ -112,6 +112,26 @@ async function closeModal() {
   if (f) await f();
 }
 
+/* ---------- 確認ダイアログ（ブラウザ標準の confirm は LINE内ブラウザなどで出ないことがあるため自前で用意） ---------- */
+function askConfirm(message, okLabel = 'OK', danger = false) {
+  return new Promise((resolve) => {
+    let answered = false;
+    const done = (v) => { if (answered) return; answered = true; resolve(v); };
+    openModal(`
+      <h3>確認</h3>
+      <p class="confirm-msg">${esc(message)}</p>
+      <div class="modal-actions">
+        <button class="btn" data-confirm="0">キャンセル</button>
+        <button class="btn ${danger ? 'danger' : 'primary'}" data-confirm="1">${esc(okLabel)}</button>
+      </div>`, () => done(false));
+    document.querySelectorAll('[data-confirm]').forEach((b) => b.addEventListener('click', async () => {
+      const v = b.dataset.confirm === '1';
+      done(v);
+      await closeModal();
+    }));
+  });
+}
+
 /* ---------- 画面の切り替え ---------- */
 const app = $('#app');
 let editing = null;      // 編集中の状態 { draft, dirty, isNew }
@@ -120,8 +140,15 @@ let suppressRoute = false;
 
 window.addEventListener('hashchange', () => {
   if (suppressRoute) { suppressRoute = false; return; }
-  if (editing?.dirty && !confirm('保存していない変更があります。破棄して移動しますか？')) {
-    suppressRoute = true; location.hash = currentHash; return;
+  if (editing?.dirty) {
+    const target = location.hash;
+    suppressRoute = true; location.hash = currentHash; // いったん元の画面に戻して確認する
+    askConfirm('保存していない変更があります。破棄して移動しますか？', '破棄して移動', true).then((ok) => {
+      if (!ok) return;
+      editing.dirty = false;
+      location.hash = target;
+    });
+    return;
   }
   route();
 });
@@ -467,11 +494,11 @@ function addItem(name) {
   target?.focus();
 }
 
-function removeItem(name, i) {
+async function removeItem(name, i) {
   const d = editing.draft;
   const it = d[name][i];
   const hasText = name === 'chapters' ? (it.title.trim() || it.body.trim()) : it.text.trim();
-  if (hasText && !confirm('この項目を削除しますか？')) return;
+  if (hasText && !(await askConfirm('この項目を削除しますか？', '削除する', true))) return;
   d[name].splice(i, 1);
   editing.dirty = true;
   renderItems(name);
@@ -936,7 +963,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'copy': copyText($('#sharePreview').value); break;
     case 'delete':
-      if (viewing && confirm(`「${viewing.title}」の記録を削除します。元に戻せません。よろしいですか？`)) {
+      if (viewing && await askConfirm(`「${viewing.title}」の記録を削除します。元に戻せません。よろしいですか？`, '削除する', true)) {
         await Store.remove(viewing.id); toast('削除しました'); location.hash = '#/';
       }
       break;
