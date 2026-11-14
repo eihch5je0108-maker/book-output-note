@@ -431,3 +431,15 @@ input[type="checkbox"]:checked::after {
 /* ---------- 確認ダイアログ ---------- */
 .confirm-msg { margin: 8px 0 18px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
 .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* ---------- ログイン・アカウント ---------- */
+.login { text-align: center; }
+.login p { color: var(--sub); }
+.login-btn { min-height: 48px; padding: 10px 26px; font-size: 15px; }
+.login-note { font-size: 12px; margin: 18px 0 0 !important; color: var(--faint) !important; }
+.login-warn { background: #fdecea; color: var(--red) !important; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.account { display: flex; align-items: center; gap: 12px; background: var(--paper); border-radius: 10px; padding: 10px 12px; margin: 10px 0 6px; }
+.account img { width: 38px; height: 38px; border-radius: 50%; flex: none; }
+.account div { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.4; }
+.account small { color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.login p { text-wrap: pretty; }

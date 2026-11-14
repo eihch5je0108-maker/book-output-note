@@ -3,7 +3,7 @@
 /* =========================================================
    読書アウトプットノート
    - 段階1：データは端末（localStorage）に保存
-   - 段階2：Store を Firebase 版に差し替えれば同期できる作り
+   - 段階2：firebase-config.js を設定すると、Googleログイン＋クラウド保存（スマホとPCで同期）
    ========================================================= */
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -12,9 +12,11 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const fmtDate = (s) => s ? s.replace(/-/g, '/') : '';
 
-/* ---------- データ保存（ここを差し替えればクラウド保存になる） ---------- */
+/* ---------- データ保存 ----------
+   LocalStore：この端末だけに保存
+   Cloud.store：Firebase に保存（firebase-config.js を設定したとき） */
 const STORAGE_KEY = 'book-output-note:v1';
-const Store = {
+const LocalStore = {
   _read() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } },
   _write(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); },
   async list() { return this._read(); },
@@ -29,6 +31,8 @@ const Store = {
   async remove(id) { this._write(this._read().filter((b) => b.id !== id)); },
   async replaceAll(list) { this._write(list); },
 };
+let Store = LocalStore;
+let Cloud = null; // クラウド保存を使うときに読みこむ
 
 const pref = {
   get(k, d) { try { const v = localStorage.getItem('bon:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -154,16 +158,19 @@ window.addEventListener('hashchange', () => {
 });
 window.addEventListener('beforeunload', (e) => { if (editing?.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
-async function route() {
+// soft = true のときは、スクロール位置や開いている画面をそのままにして描き直す（別の端末からの変更の反映用）
+async function route(soft = false) {
   currentHash = location.hash;
-  closeModal();
+  if (Cloud && !Cloud.user) return renderLogin();
+  if (!soft) { closeModal(); window.scrollTo(0, 0); }
   const [, view, id] = (location.hash.slice(1) || '/').split('/');
-  window.scrollTo(0, 0);
+  const y = window.scrollY;
   editing = null;
-  if (view === 'book' && id) return renderDetail(id);
-  if (view === 'edit' && id) return renderEdit(id);
-  if (view === 'new') return renderEdit(null);
-  return renderList();
+  if (view === 'book' && id) await renderDetail(id);
+  else if (view === 'edit' && id) await renderEdit(id);
+  else if (view === 'new') await renderEdit(null);
+  else await renderList();
+  if (soft) window.scrollTo(0, y);
 }
 
 /* =========================================================
@@ -878,17 +885,28 @@ async function copyText(text) {
    データの管理（書き出し・読み込み）
    ========================================================= */
 async function openSettings() {
+  if (Cloud && !Cloud.user) { toast('先にログインしてください'); return; }
   const books = await Store.list();
+  const cloud = !!Cloud;
   openModal(`
     <h3>データの管理</h3>
-    <p class="hint">記録は今、この端末のブラウザの中に保存されています（${books.length}冊）。</p>
+    ${cloud ? `
+      <div class="account">
+        ${Cloud.user.photoURL ? `<img src="${esc(Cloud.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : ''}
+        <div><b>${esc(Cloud.user.displayName || 'ログイン中')}</b><small>${esc(Cloud.user.email || '')}</small></div>
+        <button class="btn small" data-act="logout">ログアウト</button>
+      </div>
+      <p class="hint">記録はクラウドに保存され、同じGoogleアカウントでログインしたスマホとPCで同じ内容が見られます（${books.length}冊）。</p>`
+    : `<p class="hint">記録は今、この端末のブラウザの中に保存されています（${books.length}冊）。</p>`}
     <div class="settings-list">
       <button class="btn block" data-act="export">バックアップを書き出す（ファイル保存）</button>
       <label class="btn block">バックアップを読み込む<input type="file" accept="application/json,.json" data-act="import" hidden></label>
     </div>
     <div class="note-box">
-      ・別の端末に移すときは、書き出したファイルを移して「読み込む」を押してください。同じ本は新しい方が残ります。<br>
-      ・ブラウザのデータを消すと記録も消えるので、ときどき書き出しておくと安心です。
+      ${cloud
+        ? '・バックアップの書き出しは、念のための控えとして使えます。読み込むと、同じ本は新しい方が残ります。'
+        : `・別の端末に移すときは、書き出したファイルを移して「読み込む」を押してください。同じ本は新しい方が残ります。<br>
+      ・ブラウザのデータを消すと記録も消えるので、ときどき書き出しておくと安心です。`}
     </div>
     <div class="modal-actions" style="margin-top:14px"><button class="btn" data-act="close-modal">閉じる</button></div>`);
 }
@@ -937,6 +955,12 @@ document.addEventListener('click', async (e) => {
     case 'close-modal': closeModal(); break;
     case 'settings': openSettings(); break;
     case 'export': exportData(); break;
+    case 'login': doLogin(el); break;
+    case 'logout':
+      if (await askConfirm('ログアウトしますか？ もう一度ログインすれば、記録はそのまま見られます。', 'ログアウト')) {
+        await Cloud.signOut(); toast('ログアウトしました');
+      }
+      break;
     case 'cancel': history.length > 1 ? history.back() : (location.hash = '#/'); break;
     case 'save': saveDraft(); break;
     case 'add': addItem(el.dataset.list); break;
@@ -997,4 +1021,93 @@ document.addEventListener('change', async (e) => {
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 window.addEventListener('resize', () => { if (editing) growAll(); });
 
-route();
+/* =========================================================
+   ログイン（クラウド保存を使うとき）
+   ========================================================= */
+const inLineApp = /\bLine\//i.test(navigator.userAgent);
+
+function renderLogin() {
+  editing = null;
+  closeModal();
+  app.innerHTML = `
+    <div class="empty"><div class="sheet login">
+      <h2>ログイン</h2>
+      <p>Googleアカウントでログインすると、スマホとPCで同じ記録を見られます。</p>
+      ${inLineApp ? `<p class="login-warn">LINEの中で開いているため、ログインできません。<br>右上のメニューから「ブラウザで開く」を選んでください。</p>` : ''}
+      <button class="btn primary login-btn" data-act="login">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#fff" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path fill="#fff" opacity=".85" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#fff" opacity=".7" d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2L6.4 14z"/><path fill="#fff" opacity=".55" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10C7.2 7.7 9.4 6 12 6z"/></svg>
+        Googleでログイン
+      </button>
+      <p class="login-note">ログインに使うのはお名前とメールアドレスだけです。記録は本人しか見られません。</p>
+    </div></div>`;
+}
+
+async function doLogin(btn) {
+  btn.disabled = true;
+  try {
+    await Cloud.signIn();
+  } catch (e) {
+    const code = e?.code || '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {}
+    else if (code === 'auth/popup-blocked') toast('ログイン画面が開けませんでした。ポップアップを許可してください');
+    else if (code === 'auth/unauthorized-domain') toast('このURLがFirebaseの「承認済みドメイン」に登録されていません');
+    else if (code === 'auth/network-request-failed') toast('通信できませんでした。電波の状態を確認してください');
+    else toast('ログインできませんでした（' + (code || 'エラー') + '）');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// この端末に保存してあった記録を、初回ログイン時にクラウドへ移す
+async function migrateLocal(u) {
+  const key = 'migrated:' + u.uid;
+  if (pref.get(key, false)) return;
+  const local = await LocalStore.list();
+  if (local.length) {
+    const ok = await askConfirm(`この端末に保存されている記録が${local.length}冊あります。クラウドに移して、スマホとPCで見られるようにしますか？`, 'クラウドに移す');
+    if (!ok) { pref.set(key, true); return; }
+    const cloud = new Map((await Cloud.store.list()).map((b) => [b.id, b]));
+    const toWrite = local.filter((b) => !cloud.has(b.id) || (b.updatedAt || 0) > (cloud.get(b.id).updatedAt || 0));
+    await Cloud.store.replaceAll(toWrite);
+    toast(`${toWrite.length}冊をクラウドに移しました`);
+  }
+  pref.set(key, true);
+}
+
+let cloudErrorShown = false;
+function onCloudError(e) {
+  if (cloudErrorShown) return;
+  cloudErrorShown = true;
+  setTimeout(() => { cloudErrorShown = false; }, 8000);
+  if (e?.code === 'permission-denied') toast('クラウドに保存できませんでした（Firestoreのルール設定を確認してください）');
+  else toast('クラウドとの通信でエラーが起きました。時間をおいて開き直してください');
+}
+
+async function boot() {
+  const cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey) { route(); return; } // 設定がなければ、この端末だけに保存
+  app.innerHTML = '<p class="blank-note">読み込んでいます…</p>';
+  try {
+    Cloud = await import('./cloud.js?v=5');
+    await Cloud.init(cfg, {
+      onUser: async (u) => {
+        if (!u) { Store = LocalStore; renderLogin(); return; }
+        Store = Cloud.store;
+        await Cloud.store.ready;
+        route();
+        await migrateLocal(u);
+        if (!editing) route(true);
+      },
+      // ほかの端末で変更があったら、編集中でなければ描き直す
+      onRemoteChange: () => { if (!editing && $('#modal').hidden) route(true); },
+      onError: onCloudError,
+    });
+  } catch (e) {
+    console.error(e);
+    Cloud = null; Store = LocalStore;
+    toast('クラウドに接続できませんでした。この端末の記録を表示しています');
+    route();
+  }
+}
+
+boot();
