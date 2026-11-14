@@ -40,8 +40,7 @@ function newBook() {
     id: uid(), title: '', author: '', publisher: '', isbn: '', cover: '',
     readDate: today(), rating: 0, tags: [],
     oneLine: '', summary: '',
-    chapterUnit: '章',
-    chapters: [{ title: '序章', body: '' }, { title: '第1章', body: '' }, { title: '第2章', body: '' }],
+    chapters: [{ title: '', body: '' }, { title: '', body: '' }, { title: '', body: '' }],
     quotes: [{ text: '' }, { text: '' }, { text: '' }],
     actions: [{ text: '', done: false }, { text: '', done: false }, { text: '', done: false }],
     createdAt: Date.now(), updatedAt: Date.now(),
@@ -334,9 +333,8 @@ async function renderEdit(id) {
   while (book.quotes.length < 3) book.quotes.push({ text: '' });
   while (book.actions.length < 3) book.actions.push({ text: '', done: false });
   if (!book.chapters.length) book.chapters = newBook().chapters;
-  if (!book.chapterUnit) book.chapterUnit = '章';
   book._tags = (book.tags || []).join(' ');
-  editing = { draft: book, dirty: false, isNew: !id, prevUnit: unitOf(book) };
+  editing = { draft: book, dirty: false, isNew: !id };
 
   app.innerHTML = `
     <div class="toolbar">
@@ -367,15 +365,9 @@ async function renderEdit(id) {
       <textarea class="ruled" data-path="summary" placeholder="どんな人に向けて、何が書かれている本？">${esc(book.summary)}</textarea>
 
       <h2 class="sec-title"><span class="num">04</span>章ごとのまとめ</h2>
-      <p class="sec-hint">章ごとに、どんなことが書かれていたかを詳しく。たくさん書いても、本の画面では最初の数行だけ表示されます。</p>
-      <div class="unit-row">
-        <label for="unitInput">区切りの呼び方</label>
-        <input id="unitInput" class="unit-input" list="unitList" data-path="chapterUnit" value="${esc(book.chapterUnit)}" placeholder="章" autocomplete="off">
-        <datalist id="unitList">${UNIT_PRESETS.map((u) => `<option value="${u}">`).join('')}</datalist>
-        <span class="unit-ex" id="unitEx"></span>
-      </div>
+      <p class="sec-hint">章ごとに、どんなことが書かれていたかを詳しく。見出し（序章、第1章、第1話、Part 1 など）は本に合わせて自由に入力してください。たくさん書いても、本の画面では最初の数行だけ表示されます。</p>
       <div id="list-chapters"></div>
-      <button class="add-btn" data-act="add" data-list="chapters" id="addChBtn">＋ 章を追加</button>
+      <button class="add-btn" data-act="add" data-list="chapters">＋ 区切りを追加</button>
 
       <h2 class="sec-title"><span class="num">05</span>心に残った一文</h2>
       <div id="list-quotes"></div>
@@ -394,7 +386,6 @@ async function renderEdit(id) {
   renderBasic();
   ['chapters', 'quotes', 'actions'].forEach(renderItems);
   updateCounter();
-  updateUnitUI();
   growAll();
   $('#lookupQ').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doLookup(); } });
 }
@@ -431,7 +422,7 @@ function renderItems(name) {
   if (name === 'chapters') {
     box.innerHTML = d.chapters.map((c, i) => `
       <div class="chapter-item">
-        <div class="item"><input class="line-input grow" data-path="chapters.${i}.title" value="${esc(c.title)}" placeholder="章のタイトル（例：第1章 〇〇）">${rm(i, 'この章')}</div>
+        <div class="item"><input class="line-input grow" data-path="chapters.${i}.title" value="${esc(c.title)}" placeholder="見出し（例：序章、第1章、第1話）">${rm(i, 'この章')}</div>
         <textarea class="ruled long" data-path="chapters.${i}.body" placeholder="この章にはどんなことが書かれていた？ 気づいたこと、具体例、自分の考えなど、いくらでも書けます">${esc(c.body)}</textarea>
         <div class="counter" data-count="${i}">${[...c.body].length.toLocaleString()}字</div>
       </div>`).join('');
@@ -463,65 +454,27 @@ function updateCounter() {
   el.textContent = `${n} / 80字`;
 }
 
-/* ---------- 区切りの呼び方（章・話・Part など、本ごとに決められる） ---------- */
-const UNIT_PRESETS = ['章', '話', '夜', '部', '講', '限目', '日目', 'Part', 'Lesson', 'Step', 'Chapter'];
-const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const unitOf = (d) => (d.chapterUnit || '').trim() || '章';
-const unitStyle = (u) => /^[A-Za-z]/.test(u) ? 'latin' : /^(日目|限目|時間目|回目)$/.test(u) ? 'suffix' : 'dai';
-function unitTitle(n, u) {
-  const st = unitStyle(u);
-  return st === 'latin' ? `${u} ${n}` : st === 'suffix' ? `${n}${u}` : `第${n}${u}`;
-}
-function unitRe(u) {
-  const st = unitStyle(u), e = escRe(u);
-  return st === 'latin' ? new RegExp(`^${e}\\s*(\\d+)`, 'i') : st === 'suffix' ? new RegExp(`^(\\d+)${e}`) : new RegExp(`^第(\\d+)${e}`);
-}
-function chapterNum(title, u) { return +((String(title).match(unitRe(u)) || [])[1] || 0); }
-function nextChapterTitle() {
-  const u = unitOf(editing.draft);
-  const nums = editing.draft.chapters.map((c) => chapterNum(c.title, u));
-  return unitTitle(Math.max(0, ...nums) + 1, u);
-}
-function updateUnitUI() {
-  const u = unitOf(editing.draft);
-  const ex = $('#unitEx'); if (ex) ex.textContent = `例：${unitTitle(1, u)}、${unitTitle(2, u)}…`;
-  const btn = $('#addChBtn'); if (btn) btn.textContent = `＋ ${nextChapterTitle()}を追加`;
-}
-// 呼び方を変えたら、自動で付いた「第1章」などの見出しもまとめて置きかえる
-function changeUnit() {
-  const prev = editing.prevUnit, next = unitOf(editing.draft);
-  if (prev === next) return;
-  editing.draft.chapters.forEach((c) => {
-    const n = chapterNum(c.title, prev);
-    if (n) c.title = c.title.replace(unitRe(prev), unitTitle(n, next));
-  });
-  editing.prevUnit = next;
-  renderItems('chapters');
-}
-
 function addItem(name) {
   const d = editing.draft;
-  if (name === 'chapters') d.chapters.push({ title: nextChapterTitle(), body: '' });
+  if (name === 'chapters') d.chapters.push({ title: '', body: '' });
   if (name === 'quotes') d.quotes.push({ text: '' });
   if (name === 'actions') d.actions.push({ text: '', done: false });
   editing.dirty = true;
   renderItems(name);
-  if (name === 'chapters') updateUnitUI();
   const box = $('#list-' + name);
   const last = box.lastElementChild;
-  const target = name === 'chapters' ? last.querySelector('textarea') : last.querySelector('textarea, input:not([type=checkbox])');
+  const target = last.querySelector('textarea, input:not([type=checkbox])');
   target?.focus();
 }
 
 function removeItem(name, i) {
   const d = editing.draft;
   const it = d[name][i];
-  const hasText = name === 'chapters' ? it.body.trim() : it.text.trim();
+  const hasText = name === 'chapters' ? (it.title.trim() || it.body.trim()) : it.text.trim();
   if (hasText && !confirm('この項目を削除しますか？')) return;
   d[name].splice(i, 1);
   editing.dirty = true;
   renderItems(name);
-  if (name === 'chapters') updateUnitUI();
 }
 
 function parseTags(s) {
@@ -540,7 +493,6 @@ async function saveDraft() {
     ...rest,
     title: d.title.trim(), author: d.author.trim(), publisher: d.publisher.trim(), isbn: d.isbn.trim(),
     tags: parseTags(_tags),
-    chapterUnit: unitOf(d),
     chapters: d.chapters.filter((c) => c.title.trim() || c.body.trim()),
     quotes: d.quotes.filter((q) => q.text.trim()),
     actions: d.actions.filter((a) => a.text.trim()),
@@ -999,9 +951,7 @@ document.addEventListener('input', (e) => {
   editing.dirty = true;
   if (t.tagName === 'TEXTAREA') autoGrow(t);
   if (p === 'oneLine') updateCounter();
-  if (p === 'chapterUnit') { changeUnit(); updateUnitUI(); }
   const m = p.match(/^chapters\.(\d+)\.(title|body)$/);
-  if (m && m[2] === 'title') updateUnitUI();
   if (m && m[2] === 'body') { const c = $(`[data-count="${m[1]}"]`); if (c) c.textContent = `${[...t.value].length.toLocaleString()}字`; }
   if (p === 'title' && !editing.draft.cover) {
     const ph = $('#basic .cover-ph'); if (ph) { ph.style.background = phColor(t.value || '?'); ph.firstElementChild.textContent = t.value || 'No Title'; }
