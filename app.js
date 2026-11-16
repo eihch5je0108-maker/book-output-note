@@ -46,6 +46,7 @@ function newBook() {
     oneLine: '', summary: '',
     chapters: [{ title: '', body: '' }, { title: '', body: '' }, { title: '', body: '' }],
     quotes: [{ text: '' }, { text: '' }, { text: '' }],
+    questions: [{ text: '' }, { text: '' }, { text: '' }],
     actions: [{ text: '', done: false }, { text: '', done: false }, { text: '', done: false }],
     createdAt: Date.now(), updatedAt: Date.now(),
   };
@@ -228,7 +229,8 @@ async function renderList() {
       if (!q) return true;
       const hay = [b.title, b.author, b.publisher, b.oneLine, b.summary, ...(b.tags || []),
         ...(b.chapters || []).flatMap((c) => [c.title, c.body]),
-        ...(b.quotes || []).map((x) => x.text), ...(b.actions || []).map((x) => x.text)].join('\n').toLowerCase();
+        ...(b.quotes || []).map((x) => x.text), ...(b.actions || []).map((x) => x.text),
+        ...(b.questions || []).map((x) => x.text)].join('\n').toLowerCase();
       return q.split(/\s+/).every((w) => hay.includes(w));
     });
     const s = listState.sort;
@@ -278,8 +280,9 @@ async function renderDetail(id) {
   viewing = b;
   const chapters = (b.chapters || []).filter((c) => c.body.trim());
   const quotes = (b.quotes || []).filter((q) => q.text.trim());
+  const questions = (b.questions || []).filter((q) => q.text.trim());
   const actions = (b.actions || []).filter((a) => a.text.trim());
-  const hasBody = b.oneLine || b.summary || chapters.length || quotes.length || actions.length;
+  const hasBody = b.oneLine || b.summary || chapters.length || quotes.length || actions.length || questions.length;
   const meta = [b.publisher, b.readDate && `読了 ${fmtDate(b.readDate)}`].filter(Boolean).join(' ・ ');
 
   app.innerHTML = `
@@ -315,6 +318,8 @@ async function renderDetail(id) {
       ${actions.length ? `<h2 class="sec-title">すぐに行動に移すこと</h2>
         <ul class="checklist">${actions.map((a, i) => `<li><label><input type="checkbox" data-done="${i}" ${a.done ? 'checked' : ''}><span class="${a.done ? 'done-text' : ''}">${esc(a.text)}</span></label></li>`).join('')}</ul>
         <div class="progress"><div class="progress-bar"><span id="progBar"></span></div><span id="progText"></span></div>` : ''}
+      ${questions.length ? `<h2 class="sec-title">質問したいこと</h2>
+        <ul class="qlist">${questions.map((q) => `<li><span class="qmark-q">Q</span><span>${esc(q.text)}</span></li>`).join('')}</ul>` : ''}
       ${hasBody ? '' : `<p class="blank-note">まだ中身が書かれていません。「編集する」から書き足しましょう。</p>`}
     </article>
     <div class="detail-actions">
@@ -376,6 +381,8 @@ async function renderEdit(id) {
     book = newBook();
   }
   while (book.quotes.length < 3) book.quotes.push({ text: '' });
+  book.questions = book.questions || [];
+  while (book.questions.length < 3) book.questions.push({ text: '' });
   while (book.actions.length < 3) book.actions.push({ text: '', done: false });
   if (!book.chapters.length) book.chapters = newBook().chapters;
   book._tags = (book.tags || []).join(' ');
@@ -422,6 +429,11 @@ async function renderEdit(id) {
       <p class="sec-hint">読んで終わりにしないために。小さく、今日からできることを。</p>
       <div id="list-actions"></div>
       <button class="add-btn" data-act="add" data-list="actions">＋ 行動を追加</button>
+
+      <h2 class="sec-title"><span class="num">07</span>質問したいこと</h2>
+      <p class="sec-hint">読んでいて疑問に思ったこと、詳しい人や著者に聞いてみたいことを書き留めておきましょう。</p>
+      <div id="list-questions"></div>
+      <button class="add-btn" data-act="add" data-list="questions">＋ 質問を追加</button>
     </div>
     <div class="save-bar"><div class="inner">
       <button class="btn" data-act="cancel">キャンセル</button>
@@ -429,7 +441,7 @@ async function renderEdit(id) {
     </div></div>`;
 
   renderBasic();
-  ['chapters', 'quotes', 'actions'].forEach(renderItems);
+  ['chapters', 'quotes', 'actions', 'questions'].forEach(renderItems);
   updateCounter();
   growAll();
   $('#lookupQ').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doLookup(); } });
@@ -476,6 +488,11 @@ function renderItems(name) {
       <div class="item quote-item"><span class="qmark">“</span>
         <textarea class="ruled one grow" rows="1" data-path="quotes.${i}.text" placeholder="心に残った一文 ${i + 1}">${esc(q.text)}</textarea>${rm(i, 'この一文')}
       </div>`).join('');
+  } else if (name === 'questions') {
+    box.innerHTML = d.questions.map((q, i) => `
+      <div class="item quote-item"><span class="qmark q">Q</span>
+        <textarea class="ruled one grow" rows="1" data-path="questions.${i}.text" placeholder="${i === 0 ? '例：この方法は、忙しい人でも続けられる？' : `質問 ${i + 1}`}">${esc(q.text)}</textarea>${rm(i, 'この質問')}
+      </div>`).join('');
   } else {
     box.innerHTML = d.actions.map((a, i) => `
       <div class="item action-item">
@@ -503,6 +520,7 @@ function addItem(name) {
   const d = editing.draft;
   if (name === 'chapters') d.chapters.push({ title: '', body: '' });
   if (name === 'quotes') d.quotes.push({ text: '' });
+  if (name === 'questions') d.questions.push({ text: '' });
   if (name === 'actions') d.actions.push({ text: '', done: false });
   editing.dirty = true;
   renderItems(name);
@@ -540,6 +558,7 @@ async function saveDraft() {
     tags: parseTags(_tags),
     chapters: d.chapters.filter((c) => c.title.trim() || c.body.trim()),
     quotes: d.quotes.filter((q) => q.text.trim()),
+    questions: d.questions.filter((q) => q.text.trim()),
     actions: d.actions.filter((a) => a.text.trim()),
     updatedAt: Date.now(),
   };
@@ -787,15 +806,15 @@ async function openScanner() {
    ========================================================= */
 const SHARE_OPTS = [
   ['rating', '評価'], ['oneLine', 'ひとこと紹介'], ['summary', '簡単な紹介'],
-  ['chapters', '章ごとのまとめ'], ['quotes', '心に残った一文'], ['actions', 'すぐに行動に移すこと'],
+  ['chapters', '章ごとのまとめ'], ['quotes', '心に残った一文'], ['actions', 'すぐに行動に移すこと'], ['questions', '質問したいこと'],
 ];
-const SHARE_DEFAULT = { rating: true, oneLine: true, summary: true, chapters: false, quotes: true, actions: true };
+const SHARE_DEFAULT = { rating: true, oneLine: true, summary: true, chapters: false, quotes: true, actions: true, questions: true };
 
 function shareAvailable(b, k) {
   if (k === 'rating') return !!b.rating;
   if (k === 'oneLine' || k === 'summary') return !!b[k]?.trim();
   if (k === 'chapters') return b.chapters.some((c) => c.body.trim());
-  if (k === 'quotes' || k === 'actions') return b[k].some((x) => x.text.trim());
+  if (k === 'quotes' || k === 'actions' || k === 'questions') return (b[k] || []).some((x) => x.text.trim());
   return false;
 }
 
@@ -826,6 +845,10 @@ function composeText(b, sel, chSel) {
     const as = b.actions.filter((a) => a.text.trim());
     if (as.length) block('すぐに行動に移すこと', as.map((a) => `${a.done ? '✅' : '□'} ${a.text.trim()}`).join('\n'));
   }
+  if (sel.questions) {
+    const qs = (b.questions || []).filter((q) => q.text.trim());
+    if (qs.length) block('質問したいこと', qs.map((q) => `Q. ${q.text.trim()}`).join('\n'));
+  }
   return out.join('\n');
 }
 
@@ -833,7 +856,7 @@ function composeText(b, sel, chSel) {
 function openShare(b, onlyChapter) {
   const single = onlyChapter != null;
   const sel = single
-    ? { rating: false, oneLine: false, summary: false, chapters: true, quotes: false, actions: false }
+    ? { rating: false, oneLine: false, summary: false, chapters: true, quotes: false, actions: false, questions: false }
     : { ...SHARE_DEFAULT, ...pref.get('shareSel', {}) };
   const chList = b.chapters.map((c, i) => ({ c, i })).filter((x) => x.c.body.trim());
   const chSel = new Set(single ? [onlyChapter] : chList.map((x) => x.i));

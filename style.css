@@ -446,3 +446,13 @@ input[type="checkbox"]:checked::after {
 
 /* 本の画面の文章は少し詰めた罫線 */
 .prose, .clamp { --lh: 28px; }
+
+/* ---------- 質問したいこと ---------- */
+.qmark.q { font-family: var(--sans); font-size: 15px; font-weight: 800; margin-top: 5px; width: 16px; text-align: center; }
+.qlist { list-style: none; margin: 8px 0 0; padding: 0; }
+.qlist li { display: flex; gap: 10px; align-items: flex-start; padding: 9px 2px; border-bottom: 1px solid var(--rule); white-space: pre-wrap; word-break: break-word; }
+.qmark-q {
+  flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; font-size: 12px; font-weight: 800;
+}
