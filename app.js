@@ -799,19 +799,25 @@ function shareAvailable(b, k) {
   return false;
 }
 
+// 見出しの最初の区切り（「第1章　思い通りに…」なら「第1章」）
+const chapterShortName = (title) => String(title).trim().split(/[\s\u3000]+/)[0];
+
 function composeText(b, sel, chSel) {
-  const out = [`📖『${b.title}』`];
-  if (b.author) out.push(`著：${b.author}`);
+  const chs = sel.chapters ? b.chapters.filter((c, i) => c.body.trim() && chSel.has(i)) : [];
+  // 1行目の定型文：📖『本のタイトル』第1章をアウトプットします。
+  const names = chs.map((c) => chapterShortName(c.title)).filter(Boolean);
+  const out = [`📖『${b.title}』${names.join('・')}をアウトプットします。`];
   if (sel.rating && b.rating) out.push('★'.repeat(b.rating) + '☆'.repeat(5 - b.rating));
   const block = (head, body) => { out.push('', `【${head}】`, body); };
   if (sel.oneLine && b.oneLine.trim()) block('ひとことで言うと', b.oneLine.trim());
   if (sel.summary && b.summary.trim()) block('簡単な紹介', b.summary.trim());
-  if (sel.chapters) {
-    // 章ごとに見出しを分けて並べる
-    b.chapters.forEach((c, i) => {
-      if (c.body.trim() && chSel.has(i)) block(c.title.trim() || '（無題）', c.body.trim());
-    });
-  }
+  // 章は【】でくくらず、見出しのあとに1行あけて本文を続ける
+  chs.forEach((c) => {
+    const title = c.title.trim();
+    if (title) out.push('', title, '');
+    else out.push('');
+    out.push(c.body.trim());
+  });
   if (sel.quotes) {
     const qs = b.quotes.filter((q) => q.text.trim());
     if (qs.length) block('心に残った一文', qs.map((q) => `「${q.text.trim()}」`).join('\n'));
