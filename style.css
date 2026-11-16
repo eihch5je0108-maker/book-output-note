@@ -14,7 +14,7 @@
   --line-green: #06c755;
   --hand: "Klee One", "Hiragino Maru Gothic ProN", "Yu Gothic", serif;
   --sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
-  --lh: 1.9em;
+  --lh: 30px; /* 罫線の間隔。小数になるとスマホで文字と線がずれるので整数のpxにする */
 }
 
 * { box-sizing: border-box; }
@@ -443,3 +443,6 @@ input[type="checkbox"]:checked::after {
 .account div { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.4; }
 .account small { color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 .login p { text-wrap: pretty; }
+
+/* 本の画面の文章は少し詰めた罫線 */
+.prose, .clamp { --lh: 28px; }

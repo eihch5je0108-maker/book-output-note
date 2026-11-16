@@ -95,7 +95,18 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 
-function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+// 入力に合わせて入力欄の高さを変える。
+// 一度縮めて測ると、その瞬間にページが短くなって画面が上に飛ぶため、
+// 増えるときはそのまま伸ばし、減るときだけ測ってスクロール位置を元に戻す
+function autoGrow(el) {
+  if (el.scrollHeight > el.clientHeight) { el.style.height = el.scrollHeight + 'px'; return; }
+  const y = window.scrollY;
+  const before = el.offsetHeight;
+  el.style.height = 'auto';
+  const h = el.scrollHeight;
+  el.style.height = h + 'px';
+  if (h !== before && window.scrollY !== y) window.scrollTo(0, y);
+}
 function growAll() { document.querySelectorAll('textarea.ruled').forEach(autoGrow); }
 
 /* ---------- モーダル ---------- */
